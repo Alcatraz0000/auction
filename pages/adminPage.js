@@ -1,26 +1,67 @@
-import Head from "next/head";
-import Image from "next/image";
-import styles from "../styles/Home.module.css";
-import { css } from "@emotion/css";
-import { useContext } from "react";
+import { useState, useRef, useEffect } from "react"; // new
 import { useRouter } from "next/router";
-import { ethers } from "ethers";
-import Link from "next/link";
-import { AccountContext } from "../context";
-
+import { css } from "@emotion/css";
 import { deedContractAddress, auctionContractAddress } from "../config";
+
+import { ethers } from "ethers";
+
 import Auction from "../artifacts/contracts/Auction.sol/Auction.json";
+import Deed from "../artifacts/contracts/Deed.sol/Deed.json";
 
-export default function Home(props) {
+function adminPage(props) {
+  const initialState = { tokenId: "mario" };
   const { auction } = props;
-  const account = useContext(AccountContext);
 
+  let exist;
+
+  const [loaded, setLoaded] = useState(false);
+  const [deed, setDeed] = useState(initialState);
   const router = useRouter();
+
+  const { tokenId } = deed;
+
+  let provider;
+  let signer;
+
+  useEffect(() => {
+    setTimeout(() => {
+      /* delay rendering buttons until dynamic import is complete */
+      setLoaded(true);
+    }, 500);
+  }, []);
+
+  function onChange(e) {
+    setDeed(() => ({ ...deed, [e.target.name]: e.target.value }));
+  }
+
+  async function createToken() {
+    console.log("creo il _tokenId " + tokenId);
+    if (typeof window.ethereum !== "undefined") {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      const contract = new ethers.Contract(
+        deedContractAddress,
+        Deed.abi,
+        signer
+      );
+      console.log("contract: ", contract);
+      try {
+        const val = await contract.mintNewToken();
+        /* optional - wait for transaction to be confirmed before rerouting */
+        await provider.waitForTransaction(val.hash);
+        console.log("val: ", val);
+        exist = true;
+      } catch (err) {
+        //token dont exist !
+        console.log("Error: ", err);
+      }
+    }
+  }
 
   return (
     <div>
       <div className={postList}>
-        <p>Actually Auction</p>
+        <p>Ended Auction</p>
         {
           /* map over the posts array and render a button with the post title */
           auction.map((post, index) => (
@@ -63,7 +104,7 @@ export async function getServerSideProps() {
     Auction.abi,
     provider
   );
-  const data = await contract.getActualyAuction();
+  const data = await contract.getEndedButNotCompleteAuction();
   console.log(JSON.parse(JSON.stringify(data)));
   return {
     props: {
@@ -71,6 +112,8 @@ export async function getServerSideProps() {
     },
   };
 }
+
+export default adminPage;
 
 const arrowContainer = css`
   display: flex;
